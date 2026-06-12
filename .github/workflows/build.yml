@@ -49,7 +49,7 @@ jobs:
         cd build
         cmake .. \
           -DPICO_SDK_PATH=../pico-sdk \
-          -DPICO_BOARD=waveshare_rp2350_usb_a \
+          -DPICO_BOARD=pico2 \
           -DCMAKE_BUILD_TYPE=Release
 
     - name: Build firmware

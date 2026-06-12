@@ -35,16 +35,23 @@ jobs:
     - name: Clone PIO USB library
       run: |
         git clone https://github.com/sekigon-gonnoc/Pico-PIO-USB.git --depth=1
-        # Copy pio_usb.h to where TinyUSB expects it
-        cp Pico-PIO-USB/src/pio_usb.h pico-sdk/lib/tinyusb/hw/bsp/rp2040/
-        cp Pico-PIO-USB/src/*.h pico-sdk/lib/tinyusb/hw/bsp/rp2040/ 2>/dev/null || true
-        cp Pico-PIO-USB/src/*.pio pico-sdk/lib/tinyusb/hw/bsp/rp2040/ 2>/dev/null || true
+        # Copy PIO USB headers to ALL locations TinyUSB looks for them
+        PIO_SRC=Pico-PIO-USB/src
+        cp $PIO_SRC/pio_usb.h pico-sdk/lib/tinyusb/hw/bsp/rp2040/
+        cp $PIO_SRC/pio_usb.h pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/
+        cp $PIO_SRC/pio_usb_types.h pico-sdk/lib/tinyusb/hw/bsp/rp2040/ 2>/dev/null || true
+        cp $PIO_SRC/pio_usb_types.h pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/ 2>/dev/null || true
+        cp $PIO_SRC/*.h pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/ 2>/dev/null || true
 
-    - name: Patch TinyUSB for RP2350-USB-A
+    - name: Patch TinyUSB BSP for missing defines
       run: |
-        sed -i 's/return pio_usb_host_endpoint_abort_transfer/\/\/ return pio_usb_host_endpoint_abort_transfer/' \
+        # Add BOARD_TUH_RHPORT define to family.c
+        sed -i '1s/^/#define BOARD_TUH_RHPORT 1\n/' \
+          pico-sdk/lib/tinyusb/hw/bsp/rp2040/family.c
+        # Patch hcd_pio_usb abort functions
+        sed -i 's/^\( *\)return pio_usb_host_endpoint_abort_transfer/\1\/\/ return pio_usb_host_endpoint_abort_transfer/' \
           pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/hcd_pio_usb.c 2>/dev/null || true
-        sed -i 's/return pio_usb_host_get_frame_number/\/\/ return pio_usb_host_get_frame_number/' \
+        sed -i 's/^\( *\)return pio_usb_host_get_frame_number/\1\/\/ return pio_usb_host_get_frame_number/' \
           pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/hcd_pio_usb.c 2>/dev/null || true
 
     - name: Configure build

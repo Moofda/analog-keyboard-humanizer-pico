@@ -35,13 +35,14 @@ jobs:
     - name: Clone PIO USB library
       run: |
         git clone https://github.com/sekigon-gonnoc/Pico-PIO-USB.git --depth=1
-        # Copy PIO USB headers to ALL locations TinyUSB looks for them
+        # Copy ALL PIO USB headers to every location TinyUSB looks for them
         PIO_SRC=Pico-PIO-USB/src
-        cp $PIO_SRC/pio_usb.h pico-sdk/lib/tinyusb/hw/bsp/rp2040/
-        cp $PIO_SRC/pio_usb.h pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/
-        cp $PIO_SRC/pio_usb_types.h pico-sdk/lib/tinyusb/hw/bsp/rp2040/ 2>/dev/null || true
-        cp $PIO_SRC/pio_usb_types.h pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/ 2>/dev/null || true
-        cp $PIO_SRC/*.h pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/ 2>/dev/null || true
+        BSP_DIR=pico-sdk/lib/tinyusb/hw/bsp/rp2040
+        PIO_USB_DIR=pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb
+        cp $PIO_SRC/*.h $BSP_DIR/
+        cp $PIO_SRC/*.h $PIO_USB_DIR/
+        cp $PIO_SRC/*.pio $BSP_DIR/ 2>/dev/null || true
+        cp $PIO_SRC/*.pio $PIO_USB_DIR/ 2>/dev/null || true
 
     - name: Patch TinyUSB BSP for missing defines
       run: |

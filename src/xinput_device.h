@@ -12,5 +12,3 @@ void tud_mount_cb(void);
 void tud_umount_cb(void);
 void tud_suspend_cb(bool remote_wakeup_en);
 void tud_resume_cb(void);
-bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage,
-                                  tusb_control_request_t const *request);

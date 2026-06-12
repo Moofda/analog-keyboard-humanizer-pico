@@ -1,26 +1,81 @@
 #include "tusb.h"
+#include <string.h>
 
-// ── XInput USB Descriptors ────────────────────────────────────────────────────
-// These make Windows identify the Pico as an Xbox 360 controller
-// Matches exactly what a real Xbox 360 controller presents
+// ── Generic HID Gamepad Descriptor ───────────────────────────────────────────
+// Uses standard HID gamepad class — Windows picks this up via XInput
+// compatibility layer automatically. Same approach as most third party
+// controllers, fight sticks, and adapters.
 
-// Device descriptor
-// VID/PID matches Xbox 360 controller so Windows loads xusb22.sys automatically
+// HID Report Descriptor — standard gamepad layout matching XInput axes
+static uint8_t const desc_hid_report[] = {
+    0x05, 0x01,        // Usage Page (Generic Desktop)
+    0x09, 0x05,        // Usage (Gamepad)
+    0xA1, 0x01,        // Collection (Application)
+
+    // Buttons (16 buttons)
+    0x05, 0x09,        // Usage Page (Button)
+    0x19, 0x01,        // Usage Minimum (1)
+    0x29, 0x10,        // Usage Maximum (16)
+    0x15, 0x00,        // Logical Minimum (0)
+    0x25, 0x01,        // Logical Maximum (1)
+    0x75, 0x01,        // Report Size (1)
+    0x95, 0x10,        // Report Count (16)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    // Left Trigger (8 bit)
+    0x05, 0x01,        // Usage Page (Generic Desktop)
+    0x09, 0x32,        // Usage (Z)
+    0x15, 0x00,        // Logical Minimum (0)
+    0x26, 0xFF, 0x00,  // Logical Maximum (255)
+    0x75, 0x08,        // Report Size (8)
+    0x95, 0x01,        // Report Count (1)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    // Right Trigger (8 bit)
+    0x09, 0x35,        // Usage (Rz)
+    0x15, 0x00,        // Logical Minimum (0)
+    0x26, 0xFF, 0x00,  // Logical Maximum (255)
+    0x75, 0x08,        // Report Size (8)
+    0x95, 0x01,        // Report Count (1)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    // Left Stick X/Y (16 bit signed)
+    0x09, 0x30,        // Usage (X)
+    0x09, 0x31,        // Usage (Y)
+    0x17, 0x00, 0x80, 0xFF, 0xFF,  // Logical Minimum (-32768)
+    0x27, 0xFF, 0x7F, 0x00, 0x00,  // Logical Maximum (32767)
+    0x75, 0x10,        // Report Size (16)
+    0x95, 0x02,        // Report Count (2)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    // Right Stick X/Y (16 bit signed)
+    0x09, 0x33,        // Usage (Rx)
+    0x09, 0x34,        // Usage (Ry)
+    0x17, 0x00, 0x80, 0xFF, 0xFF,  // Logical Minimum (-32768)
+    0x27, 0xFF, 0x7F, 0x00, 0x00,  // Logical Maximum (32767)
+    0x75, 0x10,        // Report Size (16)
+    0x95, 0x02,        // Report Count (2)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    0xC0               // End Collection
+};
+
+// Device descriptor — generic gamepad, no Microsoft VID/PID needed
 tusb_desc_device_t const desc_device = {
-    .bLength            = sizeof(tusb_desc_device_t),
+    .bLength            = 18,
     .bDescriptorType    = TUSB_DESC_DEVICE,
     .bcdUSB             = 0x0200,
-    .bDeviceClass       = 0xFF,  // Vendor specific
-    .bDeviceSubClass    = 0xFF,
-    .bDeviceProtocol    = 0xFF,
-    .bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
-    .idVendor           = 0x045E,  // Microsoft
-    .idProduct          = 0x028E,  // Xbox 360 Controller
-    .bcdDevice          = 0x0114,
-    .iManufacturer      = 0x01,
-    .iProduct           = 0x02,
-    .iSerialNumber      = 0x03,
-    .bNumConfigurations = 0x01
+    .bDeviceClass       = 0x00,  // Defined by interface
+    .bDeviceSubClass    = 0x00,
+    .bDeviceProtocol    = 0x00,
+    .bMaxPacketSize0    = 64,
+    .idVendor           = 0x0F0D,  // Hori (common third party controller vendor)
+    .idProduct          = 0x0092,
+    .bcdDevice          = 0x0100,
+    .iManufacturer      = 1,
+    .iProduct           = 2,
+    .iSerialNumber      = 0,
+    .bNumConfigurations = 1
 };
 
 uint8_t const *tud_descriptor_device_cb(void) {
@@ -28,61 +83,15 @@ uint8_t const *tud_descriptor_device_cb(void) {
 }
 
 // Configuration descriptor
-// XInput uses vendor class with specific interface subclass/protocol
-// Interface has 2 endpoints: IN (reports to PC) and OUT (rumble from PC)
-#define CONFIG_TOTAL_LEN  (TUD_CONFIG_DESC_LEN + 32 + 2*7)
-#define XINPUT_DESC_TYPE_SECURITY  0x21
+#define CONFIG_TOTAL_LEN (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN)
+#define EPNUM_HID 0x81
 
 uint8_t const desc_configuration[] = {
-    // Config descriptor
-    TUD_CONFIG_DESCRIPTOR(1, 2, 0, CONFIG_TOTAL_LEN,
+    TUD_CONFIG_DESCRIPTOR(1, 1, 0, CONFIG_TOTAL_LEN,
                           TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 500),
-
-    // Interface 0: XInput gamepad
-    9, TUSB_DESC_INTERFACE, 0x00, 0x00, 0x02,
-    0xFF,   // Class: vendor specific
-    0x5D,   // Subclass: XInput
-    0x01,   // Protocol: gamepad
-    0x00,
-
-    // XInput security descriptor (required by Windows XInput driver)
-    0x11, 0x21, 0x00, 0x01, 0x01, 0x25,
-    0x81, 0x14, 0x03, 0x03, 0x03, 0x04,
-    0x13, 0x02, 0x08, 0x03, 0x03,
-
-    // Endpoint 1 IN: reports to PC at 1000hz (1ms interval)
-    7, TUSB_DESC_ENDPOINT,
-    0x81,           // EP1 IN
-    TUSB_XFER_INTERRUPT,
-    U16_TO_U8S_LE(0x0020),  // 32 bytes max packet
-    1,              // 1ms polling interval = 1000hz
-
-    // Endpoint 1 OUT: rumble from PC (we receive but ignore)
-    7, TUSB_DESC_ENDPOINT,
-    0x01,           // EP1 OUT
-    TUSB_XFER_INTERRUPT,
-    U16_TO_U8S_LE(0x0020),
-    8,              // 8ms interval
-
-    // Interface 1: XInput headset (required for full Xbox 360 compatibility)
-    9, TUSB_DESC_INTERFACE, 0x01, 0x00, 0x04,
-    0xFF, 0x5D, 0x03, 0x00,
-
-    // Security descriptor for interface 1
-    0x1B, 0x21, 0x00, 0x01, 0x01, 0x01, 0x82,
-    0x40, 0x01, 0x02, 0x20, 0x16, 0x83, 0x40,
-    0x01, 0x04, 0x20, 0x16, 0x85, 0x40, 0x01,
-    0x05, 0x20, 0x16, 0x8B, 0x46, 0x0B,
-
-    // 4 endpoints for headset interface (required by driver)
-    7, TUSB_DESC_ENDPOINT, 0x82, TUSB_XFER_INTERRUPT,
-       U16_TO_U8S_LE(0x0020), 2,
-    7, TUSB_DESC_ENDPOINT, 0x02, TUSB_XFER_INTERRUPT,
-       U16_TO_U8S_LE(0x0020), 4,
-    7, TUSB_DESC_ENDPOINT, 0x83, TUSB_XFER_ISOCHRONOUS,
-       U16_TO_U8S_LE(0x0020), 1,
-    7, TUSB_DESC_ENDPOINT, 0x03, TUSB_XFER_ISOCHRONOUS,
-       U16_TO_U8S_LE(0x0020), 1,
+    TUD_HID_DESCRIPTOR(0, 0, HID_ITF_PROTOCOL_NONE,
+                       sizeof(desc_hid_report), EPNUM_HID,
+                       CFG_TUD_HID_EP_BUFSIZE, 1)
 };
 
 uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
@@ -90,14 +99,28 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
     return desc_configuration;
 }
 
-// String descriptors
-char const *string_desc_arr[] = {
-    (const char[]){ 0x09, 0x04 },  // 0: Language = English
-    "Microsoft",                    // 1: Manufacturer
-    "Controller",                   // 2: Product
-    "000000000001",                 // 3: Serial
-};
+// HID callbacks
+uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
+    (void)instance;
+    return desc_hid_report;
+}
 
+uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
+                                hid_report_type_t report_type,
+                                uint8_t *buffer, uint16_t reqlen) {
+    (void)instance; (void)report_id; (void)report_type;
+    (void)buffer; (void)reqlen;
+    return 0;
+}
+
+void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
+                            hid_report_type_t report_type,
+                            uint8_t const *buffer, uint16_t bufsize) {
+    (void)instance; (void)report_id; (void)report_type;
+    (void)buffer; (void)bufsize;
+}
+
+// String descriptors
 static uint16_t _desc_str[32];
 
 uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
@@ -105,12 +128,15 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
     uint8_t chr_count;
 
     if (index == 0) {
-        memcpy(&_desc_str[1], string_desc_arr[0], 2);
+        _desc_str[1] = 0x0409;
         chr_count = 1;
     } else {
-        if (index >= sizeof(string_desc_arr) / sizeof(string_desc_arr[0]))
-            return NULL;
-        const char *str = string_desc_arr[index];
+        const char *str;
+        switch (index) {
+            case 1: str = "Generic"; break;
+            case 2: str = "Gamepad"; break;
+            default: return NULL;
+        }
         chr_count = (uint8_t)strlen(str);
         if (chr_count > 31) chr_count = 31;
         for (uint8_t i = 0; i < chr_count; i++)

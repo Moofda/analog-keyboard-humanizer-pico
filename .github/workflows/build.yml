@@ -61,7 +61,7 @@ jobs:
         cd build
         cmake .. \
           -DPICO_SDK_PATH=../pico-sdk \
-          -DPICO_BOARD=pico2 \
+          -DPICO_BOARD=adafruit_feather_rp2040_usb_host \
           -DPICO_PIO_USB_PATH=../Pico-PIO-USB \
           -DCMAKE_BUILD_TYPE=Release
 

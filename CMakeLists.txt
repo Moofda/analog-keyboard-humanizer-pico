@@ -54,8 +54,10 @@ target_compile_definitions(analog_keyboard_humanizer PRIVATE
     PICO_DEFAULT_UART=0
     PICO_DEFAULT_UART_TX_PIN=0
     PICO_DEFAULT_UART_RX_PIN=1
-    # RP2350-USB-A: USB-A port uses GPIO12 (D+) and GPIO13 (D-)
-    PIO_USB_DP_PIN=12
+    # Adafruit Feather RP2040 USB Host pinout
+    # D+ = GPIO16, D- = GPIO17, 5V enable = GPIO18
+    PIO_USB_DP_PIN=16
+    USB_HOST_5V_POWER_PIN=18
     CFG_TUH_RPI_PIO_USB=1
     FIRMWARE_VERSION_MAJOR=1
     FIRMWARE_VERSION_MINOR=0

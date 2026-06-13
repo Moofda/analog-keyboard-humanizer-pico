@@ -1,14 +1,17 @@
 #pragma once
 
-// Device runs on native USB port (port 0 = USB-C)
+// Device runs on native USB port (USB-C to PC)
 #define CFG_TUSB_RHPORT0_MODE   OPT_MODE_DEVICE
 
-// Host runs on PIO USB port (port 1 = USB-A)
+// Host runs on PIO USB port (USB-A for keyboard)
 #define CFG_TUSB_RHPORT1_MODE   OPT_MODE_HOST
 #define CFG_TUH_RPI_PIO_USB     1
 
-// RP2350-USB-A: USB-A connector uses GPIO12 (D+) and GPIO13 (D-)
-#define PIO_USB_DP_PIN          12
+// Adafruit Feather RP2040 USB Host pinout
+// D+ = GPIO16, D- = GPIO17 (must be consecutive)
+// 5V power enable = GPIO18 (driven high to power connected device)
+#define PIO_USB_DP_PIN          16
+#define USB_HOST_5V_POWER_PIN   18
 
 #define CFG_TUD_ENDPOINT0_SIZE  64
 

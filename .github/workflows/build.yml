@@ -35,7 +35,6 @@ jobs:
     - name: Clone PIO USB library
       run: |
         git clone https://github.com/sekigon-gonnoc/Pico-PIO-USB.git --depth=1
-        # Copy ALL PIO USB headers to every location TinyUSB looks for them
         PIO_SRC=Pico-PIO-USB/src
         BSP_DIR=pico-sdk/lib/tinyusb/hw/bsp/rp2040
         PIO_USB_DIR=pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb
@@ -44,12 +43,20 @@ jobs:
         cp $PIO_SRC/*.pio $BSP_DIR/ 2>/dev/null || true
         cp $PIO_SRC/*.pio $PIO_USB_DIR/ 2>/dev/null || true
 
-    - name: Patch TinyUSB BSP for missing defines
+    - name: Clone tusb_xinput library
       run: |
-        # Add BOARD_TUH_RHPORT define to family.c
+        git clone https://github.com/Ryzee119/tusb_xinput.git --depth=1
+        # Copy xinput host driver into TinyUSB class directory
+        cp tusb_xinput/xinput_host.c pico-sdk/lib/tinyusb/src/class/xinput/
+        cp tusb_xinput/xinput_host.h pico-sdk/lib/tinyusb/src/class/xinput/ 2>/dev/null || true
+        mkdir -p pico-sdk/lib/tinyusb/src/class/xinput
+        cp tusb_xinput/*.c pico-sdk/lib/tinyusb/src/class/xinput/
+        cp tusb_xinput/*.h pico-sdk/lib/tinyusb/src/class/xinput/
+
+    - name: Patch TinyUSB BSP
+      run: |
         sed -i '1s/^/#define BOARD_TUH_RHPORT 1\n/' \
           pico-sdk/lib/tinyusb/hw/bsp/rp2040/family.c
-        # Patch hcd_pio_usb abort functions
         sed -i 's/^\( *\)return pio_usb_host_endpoint_abort_transfer/\1\/\/ return pio_usb_host_endpoint_abort_transfer/' \
           pico-sdk/lib/tinyusb/src/portable/raspberrypi/pio_usb/hcd_pio_usb.c 2>/dev/null || true
         sed -i 's/^\( *\)return pio_usb_host_get_frame_number/\1\/\/ return pio_usb_host_get_frame_number/' \
@@ -63,6 +70,7 @@ jobs:
           -DPICO_SDK_PATH=../pico-sdk \
           -DPICO_BOARD=adafruit_feather_rp2040_usb_host \
           -DPICO_PIO_USB_PATH=../Pico-PIO-USB \
+          -DTUSB_XINPUT_PATH=../tusb_xinput \
           -DCMAKE_BUILD_TYPE=Release
 
     - name: Build firmware

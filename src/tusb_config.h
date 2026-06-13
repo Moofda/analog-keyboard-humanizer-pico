@@ -1,8 +1,14 @@
 #pragma once
 
+// Device runs on native USB port (port 0 = USB-C)
 #define CFG_TUSB_RHPORT0_MODE   OPT_MODE_DEVICE
+
+// Host runs on PIO USB port (port 1 = USB-A)
 #define CFG_TUSB_RHPORT1_MODE   OPT_MODE_HOST
 #define CFG_TUH_RPI_PIO_USB     1
+
+// RP2350-USB-A: USB-A connector uses GPIO12 (D+) and GPIO13 (D-)
+#define PIO_USB_DP_PIN          12
 
 #define CFG_TUD_ENDPOINT0_SIZE  64
 
@@ -20,7 +26,7 @@
 #define CFG_TUD_MIDI            0
 #define CFG_TUD_MSC             0
 
-// HID host
+// HID host for reading keyboard
 #define CFG_TUH_HID             4
 #define CFG_TUH_DEVICE_MAX      1
 #define CFG_TUH_HID_EPIN_BUFSIZE  64

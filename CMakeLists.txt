@@ -43,6 +43,7 @@ target_include_directories(analog_keyboard_humanizer PRIVATE
     src
     ${PICO_SDK_PATH}/lib/tinyusb/src
     ${PICO_SDK_PATH}/lib/tinyusb/hw
+    ${PICO_SDK_PATH}/lib/tinyusb/src/class/xinput
     ${PICO_PIO_USB_INC}
     ${TUSB_XINPUT_INC}
 )

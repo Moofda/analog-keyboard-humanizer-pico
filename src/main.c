@@ -1,5 +1,6 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/gpio.h"
 #include "tusb.h"
 #include "humanizer.h"
 #include "storage.h"
@@ -97,6 +98,15 @@ static void handle_config_command(void) {
 
 int main(void) {
     stdio_init_all();
+
+    // Enable 5V power to USB-A host port
+    // Adafruit Feather RP2040 USB Host requires GPIO18 driven high
+    // to provide power to connected USB devices
+#ifdef USB_HOST_5V_POWER_PIN
+    gpio_init(USB_HOST_5V_POWER_PIN);
+    gpio_set_dir(USB_HOST_5V_POWER_PIN, GPIO_OUT);
+    gpio_put(USB_HOST_5V_POWER_PIN, 1);
+#endif
 
     printf("\n[MAIN] Analog Keyboard Humanizer v%d.%d.%d\n",
            FIRMWARE_VERSION_MAJOR,

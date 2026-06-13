@@ -1,25 +1,19 @@
 #include "usb_host.h"
 #include "tusb.h"
 #include "pico/stdlib.h"
+#include "pico/mutex.h"
 #include <string.h>
 #include <stdio.h>
 
 #define XINPUT_REPORT_SIZE 20
 
-static volatile bool     _device_connected = false;
-static volatile bool     _new_report        = false;
-static XInputReport      _latest_report     = {0};
-static volatile uint32_t _report_lock = 0;
-
-static inline void lock_acquire(void) {
-    while (__sync_lock_test_and_set(&_report_lock, 1)) { tight_loop_contents(); }
-}
-
-static inline void lock_release(void) {
-    __sync_lock_release(&_report_lock);
-}
+static volatile bool  _device_connected = false;
+static volatile bool  _new_report        = false;
+static XInputReport   _latest_report     = {0};
+static mutex_t        _report_mutex;
 
 void usb_host_init(void) {
+    mutex_init(&_report_mutex);
     memset(&_latest_report, 0, sizeof(XInputReport));
     _device_connected = false;
     _new_report = false;
@@ -35,10 +29,10 @@ bool usb_host_device_connected(void) {
 
 bool usb_host_get_report(XInputReport *report) {
     if (!_new_report) return false;
-    lock_acquire();
+    mutex_enter_blocking(&_report_mutex);
     memcpy(report, (const void*)&_latest_report, sizeof(XInputReport));
     _new_report = false;
-    lock_release();
+    mutex_exit(&_report_mutex);
     return true;
 }
 
@@ -72,10 +66,10 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance,
                                   uint8_t const *report, uint16_t len)
 {
     if (len >= XINPUT_REPORT_SIZE) {
-        lock_acquire();
+        mutex_enter_blocking(&_report_mutex);
         memcpy((void*)&_latest_report, report, sizeof(XInputReport));
         _new_report = true;
-        lock_release();
+        mutex_exit(&_report_mutex);
     }
     tuh_hid_receive_report(dev_addr, instance);
 }

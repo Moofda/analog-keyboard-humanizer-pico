@@ -1,11 +1,10 @@
 #include "usb_host.h"
 #include "tusb.h"
+#include "xinput_host.h"
 #include "pico/stdlib.h"
 #include "pico/mutex.h"
 #include <string.h>
 #include <stdio.h>
-
-#define XINPUT_REPORT_SIZE 20
 
 static volatile bool  _device_connected = false;
 static volatile bool  _new_report        = false;
@@ -36,40 +35,62 @@ bool usb_host_get_report(XInputReport *report) {
     return true;
 }
 
-void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance,
-                      uint8_t const *desc_report, uint16_t desc_len)
-{
-    (void)desc_report;
-    (void)desc_len;
+// ── tusb_xinput callbacks ─────────────────────────────────────────────────────
+// These replace the standard HID callbacks and handle XInput devices natively
 
-    uint16_t vid, pid;
-    tuh_vid_pid_get(dev_addr, &vid, &pid);
-    printf("[HOST] Device mounted: VID=0x%04X PID=0x%04X\n", vid, pid);
-
-    _device_connected = true;
-
-    if (!tuh_hid_receive_report(dev_addr, instance)) {
-        printf("[HOST] Failed to request report\n");
-    }
+// Required by tusb_xinput — registers the XInput host driver with TinyUSB
+usbh_class_driver_t const *usbh_app_driver_get_cb(uint8_t *driver_count) {
+    *driver_count = 1;
+    return &usbh_xinput_driver;
 }
 
-void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
-    (void)dev_addr;
-    (void)instance;
-    printf("[HOST] Device unmounted\n");
+void tuh_xinput_mount_cb(uint8_t dev_addr, uint8_t instance,
+                          const xinputh_interface_t *xid_itf)
+{
+    printf("[HOST] XInput device mounted: dev=%d instance=%d type=%d\n",
+           dev_addr, instance, xid_itf->type);
+    _device_connected = true;
+
+    // Send LED command and start receiving reports
+    tuh_xinput_set_led(dev_addr, instance, 0, true);
+    tuh_xinput_receive_report(dev_addr, instance);
+}
+
+void tuh_xinput_umount_cb(uint8_t dev_addr, uint8_t instance) {
+    printf("[HOST] XInput device unmounted: dev=%d instance=%d\n",
+           dev_addr, instance);
     _device_connected = false;
     _new_report = false;
     memset((void*)&_latest_report, 0, sizeof(XInputReport));
 }
 
-void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance,
-                                  uint8_t const *report, uint16_t len)
+void tuh_xinput_report_received_cb(uint8_t dev_addr, uint8_t instance,
+                                    const xinputh_interface_t *xid_itf,
+                                    uint16_t len)
 {
-    if (len >= XINPUT_REPORT_SIZE) {
+    (void)len;
+
+    if (xid_itf->last_xfer_result == XFER_RESULT_SUCCESS &&
+        xid_itf->connected && xid_itf->new_pad_data)
+    {
+        const xinput_gamepad_t *pad = &xid_itf->pad;
+
         mutex_enter_blocking(&_report_mutex);
-        memcpy((void*)&_latest_report, report, sizeof(XInputReport));
+
+        _latest_report.report_id     = 0x00;
+        _latest_report.report_size   = 0x14;
+        _latest_report.buttons       = pad->wButtons;
+        _latest_report.left_trigger  = pad->bLeftTrigger;
+        _latest_report.right_trigger = pad->bRightTrigger;
+        _latest_report.left_x        = pad->sThumbLX;
+        _latest_report.left_y        = pad->sThumbLY;
+        _latest_report.right_x       = pad->sThumbRX;
+        _latest_report.right_y       = pad->sThumbRY;
         _new_report = true;
+
         mutex_exit(&_report_mutex);
     }
-    tuh_hid_receive_report(dev_addr, instance);
+
+    // Request next report immediately
+    tuh_xinput_receive_report(dev_addr, instance);
 }

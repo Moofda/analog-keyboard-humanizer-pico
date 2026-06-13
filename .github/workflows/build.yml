@@ -46,9 +46,6 @@ jobs:
     - name: Clone tusb_xinput library
       run: |
         git clone https://github.com/Ryzee119/tusb_xinput.git --depth=1
-        # Copy xinput host driver into TinyUSB class directory
-        cp tusb_xinput/xinput_host.c pico-sdk/lib/tinyusb/src/class/xinput/
-        cp tusb_xinput/xinput_host.h pico-sdk/lib/tinyusb/src/class/xinput/ 2>/dev/null || true
         mkdir -p pico-sdk/lib/tinyusb/src/class/xinput
         cp tusb_xinput/*.c pico-sdk/lib/tinyusb/src/class/xinput/
         cp tusb_xinput/*.h pico-sdk/lib/tinyusb/src/class/xinput/
